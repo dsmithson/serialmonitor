@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  serialmonitor:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/data/config.yaml
+    # Grant access to serial devices.
+    # Option A — specific devices (least privilege, preferred):
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    # Option B — full host access (easier for development):
+    # privileged: true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,24 @@
+# Binaries
+serialmonitor
+*.exe
+
+# Build output
+dist/
+
+# Go
+vendor/
+
+# Config with secrets (keep example, not live config)
+config.local.yaml
+
+# Docker
+.docker/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

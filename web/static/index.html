@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Serial Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Serial Monitor</h1>
+    <nav>
+      <button class="tab-btn active" data-tab="stream">Live Stream</button>
+      <button class="tab-btn" data-tab="terminal">Terminal</button>
+      <button class="tab-btn" data-tab="config">Configuration</button>
+    </nav>
+  </header>
+
+  <!-- ── LIVE STREAM ──────────────────────────────────────── -->
+  <section id="tab-stream" class="tab active">
+    <div class="stream-toolbar">
+      <div id="stream-legend" class="legend"></div>
+      <div class="stream-controls">
+        <label class="checkbox-label">
+          <input type="checkbox" id="stream-autoscroll" checked /> Auto-scroll
+        </label>
+        <button id="stream-clear">Clear</button>
+      </div>
+    </div>
+    <div id="stream-filters" class="filter-bar"></div>
+    <div id="stream-output" class="output-panel"></div>
+  </section>
+
+  <!-- ── TERMINAL ─────────────────────────────────────────── -->
+  <section id="tab-terminal" class="tab">
+    <div class="terminal-toolbar">
+      <label for="term-port-select">Port:</label>
+      <select id="term-port-select"><option value="">— select —</option></select>
+      <span id="term-status" class="status-dot disconnected"></span>
+    </div>
+    <div id="term-output" class="output-panel"></div>
+    <form id="term-form" class="send-bar">
+      <input id="term-input" type="text" placeholder="Type command and press Enter…" autocomplete="off" />
+      <label class="checkbox-label" title="Append carriage-return + line-feed">
+        <input type="checkbox" id="term-crlf" checked /> CR+LF
+      </label>
+      <button type="submit">Send</button>
+    </form>
+  </section>
+
+  <!-- ── CONFIGURATION ────────────────────────────────────── -->
+  <section id="tab-config" class="tab">
+    <div class="config-toolbar">
+      <button id="cfg-scan">Scan for devices</button>
+    </div>
+    <div id="cfg-message" class="cfg-message hidden"></div>
+    <table id="cfg-table">
+      <thead>
+        <tr>
+          <th>Device</th>
+          <th>Name</th>
+          <th>Baud</th>
+          <th>Data bits</th>
+          <th>Parity</th>
+          <th>Stop bits</th>
+          <th>Color</th>
+          <th>Enabled</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="cfg-tbody"></tbody>
+    </table>
+
+    <div id="cfg-add-panel" class="add-panel hidden">
+      <h3>Add device</h3>
+      <div id="cfg-available-list" class="available-list"></div>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+# Grafana Alloy pipeline reference — ship serialmonitor pod logs to Loki
+#
+# This is NOT deployed by this repo. Add it to your Alloy config or Promtail
+# pipeline config in your observability stack.
+#
+# serialmonitor emits structured JSON logs to stdout, e.g.:
+#   {"time":"...","level":"INFO","port":"arduino","device":"/dev/ttyUSB0","msg":"received","data":"..."}
+#
+# The pipeline below:
+#   1. Discovers serialmonitor pods via Kubernetes API
+#   2. Parses the JSON log lines
+#   3. Promotes "port", "level", and "device" fields to Loki labels
+#   4. Ships to your Loki instance
+#
+# With this config you can query in Grafana:
+#   {app="serialmonitor", port="arduino"} | json
+#   {app="serialmonitor"} | json | level="ERROR"
+
+# ── Alloy (River syntax) ──────────────────────────────────────
+#
+# discovery.kubernetes "serialmonitor_pods" {
+#   role = "pod"
+#   namespaces { names = ["default"] }   # adjust to your namespace
+#   selectors {
+#     role  = "pod"
+#     label = "app.kubernetes.io/name=serialmonitor"
+#   }
+# }
+#
+# loki.source.kubernetes "serialmonitor" {
+#   targets    = discovery.kubernetes.serialmonitor_pods.targets
+#   forward_to = [loki.process.serialmonitor_json.receiver]
+# }
+#
+# loki.process "serialmonitor_json" {
+#   stage.json {
+#     expressions = {
+#       port   = "port",
+#       level  = "level",
+#       device = "device",
+#     }
+#   }
+#   stage.labels {
+#     values = {
+#       port   = "",
+#       level  = "",
+#       device = "",
+#     }
+#   }
+#   forward_to = [loki.write.default.receiver]
+# }
+
+# ── Promtail (YAML syntax, if you use Promtail instead of Alloy) ─────────────
+#
+# scrape_configs:
+#   - job_name: serialmonitor
+#     kubernetes_sd_configs:
+#       - role: pod
+#     relabel_configs:
+#       - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+#         action: keep
+#         regex: serialmonitor
+#       - source_labels: [__meta_kubernetes_pod_name]
+#         target_label: pod
+#       - source_labels: [__meta_kubernetes_namespace]
+#         target_label: namespace
+#     pipeline_stages:
+#       - json:
+#           expressions:
+#             port:   port
+#             level:  level
+#             device: device
+#             output: data
+#       - labels:
+#           port:
+#           level:
+#           device:
+#       - output:
+#           source: output

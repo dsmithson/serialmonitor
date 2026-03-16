@@ -1,0 +1,16 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+ports:
+  # Example port — copy and modify as needed.
+  # Changes can also be made from the web UI at /
+  #
+  # - device: /dev/ttyUSB0
+  #   name: arduino
+  #   enabled: true
+  #   baud_rate: 115200
+  #   data_bits: 8
+  #   parity: none        # none | odd | even
+  #   stop_bits: 1        # 1 | 1.5 | 2
+  #   color: "#4CAF50"    # hex color shown in the UI (auto-assigned if omitted)
