@@ -1,0 +1,13 @@
+{{- if not .Values.persistence.existingClaim }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "serialmonitor.fullname" . }}-config
+  labels:
+    {{- include "serialmonitor.labels" . | nindent 4 }}
+data:
+  # This ConfigMap is used only to seed the PVC on first run via an init container.
+  # Once the PVC exists, the live config.yaml on the PVC is authoritative.
+  config.yaml: |
+    {{- .Values.config | toYaml | nindent 4 }}
+{{- end }}

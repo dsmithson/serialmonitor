@@ -1,0 +1,65 @@
+image:
+  repository: dsmithson/serialmonitor
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: ""        # set to your ingress class, e.g. "nginx"
+  host: serial.example.com
+  annotations: {}
+  # annotations:
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"  # needed for WebSocket
+
+# Node scheduling — serial USB devices are physically attached to specific nodes.
+# Set nodeName OR nodeSelector (not both).
+nodeName: ""           # e.g. "worker-node-01"
+nodeSelector: {}
+#   kubernetes.io/hostname: worker-node-01
+tolerations: []
+affinity: {}
+
+# Serial device host paths to mount into the pod.
+# These must exist on the scheduled node.
+devices: []
+#   - /dev/ttyUSB0
+#   - /dev/ttyUSB1
+#   - /dev/ttyACM0
+
+# Mount the entire host /dev directory for flexible device access.
+# Recommended for dedicated nodes where you don't want to enumerate devices.
+# Requires privileged: true to actually use the devices.
+hostDev: false
+
+# Set to true to run privileged — required when using hostDev or non-enumerated devices.
+privileged: false
+
+persistence:
+  # Stores config.yaml across pod restarts.
+  # Uses nfs-client-hdd by default; change to nfs-client-ssd if preferred.
+  enabled: true
+  storageClass: "nfs-client-hdd"
+  accessMode: ReadWriteOnce
+  size: 100Mi
+  # If mounting an existing PVC set existingClaim:
+  existingClaim: ""
+
+# Initial config.yaml content.
+# Changes made via the web UI are written to the PVC and will survive restarts.
+config:
+  server:
+    host: "0.0.0.0"
+    port: 8080
+  ports: []
+
+resources: {}
+#   requests:
+#     cpu: 50m
+#     memory: 64Mi
+#   limits:
+#     cpu: 200m
+#     memory: 128Mi
