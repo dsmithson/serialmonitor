@@ -16,7 +16,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 4096,
 }
 
-// wsStream handles /ws/stream — broadcasts all port messages to the client.
+// wsStream handles /ws/stream — broadcasts all port messages as JSON to the client.
 func (s *Server) wsStream(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -25,7 +25,7 @@ func (s *Server) wsStream(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	sub := s.hub.Subscribe("")
+	sub := s.hub.SubscribeWithHistory("")
 	defer s.hub.Unsubscribe(sub)
 
 	done := make(chan struct{})
@@ -56,7 +56,12 @@ func (s *Server) wsStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// wsPort handles /ws/port/{name} — bidirectional for a single port.
+// wsPort handles /ws/port/{name} — a raw binary terminal tunnel.
+//
+// Client → server: binary frames containing raw keystrokes (xterm.js onData bytes).
+// Server → client: binary frames containing raw serial output.
+//
+// This bypasses line-buffering so prompts (login:, $, etc.) appear immediately.
 func (s *Server) wsPort(w http.ResponseWriter, r *http.Request) {
 	portName := chi.URLParam(r, "name")
 
@@ -67,42 +72,55 @@ func (s *Server) wsPort(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	sub := s.hub.Subscribe(portName)
-	defer s.hub.Unsubscribe(sub)
+	tc := s.serial.RegisterTerminal(portName)
+	if tc == nil {
+		// Port not active — write ANSI error into the terminal and close.
+		msg := "\r\n\x1b[31m[port '" + portName + "' is not active — check Configuration tab]\x1b[0m\r\n"
+		conn.WriteMessage(websocket.BinaryMessage, []byte(msg))
+		return
+	}
+	defer s.serial.UnregisterTerminal(portName, tc)
 
-	// Read goroutine: client → serial port
+	// Client → serial: raw keystroke bytes from xterm.js onData
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for {
-			_, raw, err := conn.ReadMessage()
+			_, data, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
-			var req struct {
-				Data string `json:"data"`
-			}
-			if err := json.Unmarshal(raw, &req); err == nil && req.Data != "" {
-				s.serial.Send(portName, req.Data)
-			}
+			s.serial.Send(portName, data)
 		}
 	}()
 
-	// Write loop: serial port → client
+	// Serial → client: raw byte chunks forwarded immediately as binary frames
 	for {
 		select {
 		case <-done:
 			return
 		case <-r.Context().Done():
 			return
-		case msg, ok := <-sub.Ch:
+		case chunk, ok := <-tc.Ch:
 			if !ok {
 				return
 			}
 			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := conn.WriteJSON(msg); err != nil {
+			if err := conn.WriteMessage(websocket.BinaryMessage, chunk); err != nil {
 				return
 			}
 		}
 	}
+}
+
+// wsPortSend is a small REST-compatible wrapper kept for non-WS callers.
+// The primary send path is via the wsPort binary WebSocket.
+func parseJSONSend(data []byte) (string, bool) {
+	var req struct {
+		Data string `json:"data"`
+	}
+	if err := json.Unmarshal(data, &req); err != nil {
+		return "", false
+	}
+	return req.Data, true
 }

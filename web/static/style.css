@@ -117,15 +117,121 @@ nav { display: flex; gap: .25rem; }
 
 .filter-bar { display: flex; gap: .75rem; flex-wrap: wrap; }
 
-/* ── Terminal toolbar ─────────────────────────────────────── */
-.terminal-toolbar {
+/* ── Terminal layout ──────────────────────────────────────── */
+.terminal-container {
   display: flex;
-  align-items: center;
-  gap: .75rem;
+  flex: 1;
+  overflow: hidden;
+  gap: .5rem;
 }
 
+.term-port-tabs {
+  display: flex;
+  flex-direction: column;
+  width: 130px;
+  flex-shrink: 0;
+  gap: 2px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.term-right-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: .5rem;
+  min-width: 0;
+}
+
+.term-xterm-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.term-port-tabs-label {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+  padding: .25rem .5rem .4rem;
+}
+
+.term-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem .6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: .82rem;
+  color: var(--text-dim);
+  width: 100%;
+  transition: color .15s, border-color .15s, background .15s;
+  position: relative;
+}
+.term-tab-btn:hover { color: var(--text); border-color: #484f58; }
+.term-tab-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--input-bg);
+}
+
+.term-tab-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.term-tab-badge {
+  background: var(--accent);
+  color: #000;
+  font-size: .65rem;
+  font-weight: bold;
+  border-radius: 8px;
+  padding: 0 .35rem;
+  min-width: 16px;
+  text-align: center;
+  display: none;
+}
+.term-tab-badge.visible { display: block; }
+
+.term-xterminals {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+.term-xterm-wrapper {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+  padding: 4px;
+  background: #010409;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.term-xterm-wrapper.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make xterm fill its container */
+.term-xterm-wrapper .xterm {
+  flex: 1;
+  height: 100%;
+}
+.term-xterm-wrapper .xterm-viewport { width: 100% !important; }
+
 .status-dot {
-  width: 10px; height: 10px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -268,6 +374,45 @@ input[type="color"] {
   transform: translateX(16px);
   background: #fff;
 }
+
+/* ── Config toolbar extras ────────────────────────────────── */
+.cfg-sep { flex: 1; }
+
+.settings-label {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .82rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.settings-label input[type="number"] {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: .25rem .4rem;
+  font-family: inherit;
+  font-size: .82rem;
+  width: 70px;
+}
+.settings-hint { color: var(--text-dim); font-size: .75rem; }
+
+/* ── Drag-to-reorder ──────────────────────────────────────── */
+.grip-th { width: 20px; }
+
+.grip-cell {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 1rem;
+  padding: 0 .4rem;
+  user-select: none;
+  text-align: center;
+}
+.grip-cell:active { cursor: grabbing; }
+
+tr.dragging { opacity: .4; }
+tr.drag-over td { border-top: 2px solid var(--accent); }
 
 /* ── Config messages ──────────────────────────────────────── */
 .cfg-message {

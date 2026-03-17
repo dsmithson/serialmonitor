@@ -1,12 +1,15 @@
 module github.com/dsmithson/serialmonitor
 
-go 1.25.4
+go 1.26
 
 require (
-	github.com/creack/goselect v0.1.2 // indirect
-	github.com/go-chi/chi/v5 v5.2.5 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
-	go.bug.st/serial v1.6.4 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	github.com/go-chi/chi/v5 v5.2.5
+	github.com/gorilla/websocket v1.5.3
+	go.bug.st/serial v1.6.4
+	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	github.com/creack/goselect v0.1.3 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 )

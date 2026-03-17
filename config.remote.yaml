@@ -1,0 +1,40 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+ports:
+  - device: /dev/ttyUSB0
+    name: serial-0
+    enabled: true
+    baud_rate: 115200
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    color: "#4CAF50"
+
+  - device: /dev/ttyUSB1
+    name: serial-1
+    enabled: true
+    baud_rate: 115200
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    color: "#2196F3"
+
+  - device: /dev/ttyUSB2
+    name: serial-2
+    enabled: true
+    baud_rate: 115200
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    color: "#FF9800"
+
+  - device: /dev/ttyUSB3
+    name: serial-3
+    enabled: true
+    baud_rate: 115200
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    color: "#E91E63"

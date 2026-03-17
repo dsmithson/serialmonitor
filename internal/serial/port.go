@@ -1,9 +1,10 @@
 package serial
 
 import (
-	"bufio"
 	"context"
 	"log/slog"
+	"strings"
+	"sync"
 	"time"
 
 	"go.bug.st/serial"
@@ -14,23 +15,49 @@ import (
 
 const reconnectDelay = 5 * time.Second
 
+// TermConn is a raw-byte subscription to a serial port for terminal use.
+type TermConn struct {
+	Ch chan []byte
+}
+
 // Port manages a single serial connection.
 type Port struct {
 	cfg    config.PortConfig
 	hub    *broadcast.Hub
-	sendCh chan string
+	sendCh chan []byte
+
+	termMu    sync.RWMutex
+	termConns map[*TermConn]struct{}
 }
 
 func newPort(cfg config.PortConfig, hub *broadcast.Hub) *Port {
 	return &Port{
-		cfg:    cfg,
-		hub:    hub,
-		sendCh: make(chan string, 32),
+		cfg:       cfg,
+		hub:       hub,
+		sendCh:    make(chan []byte, 32),
+		termConns: make(map[*TermConn]struct{}),
 	}
 }
 
-// Send queues a string to be written to the serial port.
-func (p *Port) Send(data string) {
+// RegisterTerminal creates a raw-byte subscription to this port's output.
+func (p *Port) RegisterTerminal() *TermConn {
+	tc := &TermConn{Ch: make(chan []byte, 256)}
+	p.termMu.Lock()
+	p.termConns[tc] = struct{}{}
+	p.termMu.Unlock()
+	return tc
+}
+
+// UnregisterTerminal removes a terminal connection and closes its channel.
+func (p *Port) UnregisterTerminal(tc *TermConn) {
+	p.termMu.Lock()
+	delete(p.termConns, tc)
+	p.termMu.Unlock()
+	close(tc.Ch)
+}
+
+// Send queues raw bytes to be written to the serial port.
+func (p *Port) Send(data []byte) {
 	select {
 	case p.sendCh <- data:
 	default:
@@ -81,7 +108,7 @@ func (p *Port) connect(ctx context.Context) error {
 				writeErr <- nil
 				return
 			case data := <-p.sendCh:
-				if _, err := sp.Write([]byte(data)); err != nil {
+				if _, err := sp.Write(data); err != nil {
 					writeErr <- err
 					return
 				}
@@ -89,22 +116,56 @@ func (p *Port) connect(ctx context.Context) error {
 		}
 	}()
 
-	// Read loop
-	scanner := bufio.NewScanner(sp)
-	readDone := make(chan error, 1)
+	// Read loop — raw bytes, no line buffering.
+	readErr := make(chan error, 1)
 	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-			slog.Info("received", "port", p.cfg.Name, "device", p.cfg.Device, "data", line)
-			p.hub.Publish(broadcast.Message{
-				Port:   p.cfg.Name,
-				Device: p.cfg.Device,
-				Color:  p.cfg.Color,
-				Data:   line,
-				Ts:     time.Now().UTC().Format(time.RFC3339),
-			})
+		buf := make([]byte, 4096)
+		var lineBuf []byte
+
+		for {
+			n, err := sp.Read(buf)
+			if n > 0 {
+				chunk := make([]byte, n)
+				copy(chunk, buf[:n])
+
+				// Forward raw bytes to all terminal connections immediately.
+				p.termMu.RLock()
+				for tc := range p.termConns {
+					select {
+					case tc.Ch <- chunk:
+					default: // slow subscriber, drop
+					}
+				}
+				p.termMu.RUnlock()
+
+				// Accumulate into lines for the hub (live stream + stdout log).
+				for _, b := range chunk {
+					switch b {
+					case '\n':
+						line := strings.TrimRight(string(lineBuf), "\r")
+						if line != "" {
+							slog.Info("received", "port", p.cfg.Name, "device", p.cfg.Device, "data", line)
+							p.hub.Publish(broadcast.Message{
+								Port:   p.cfg.Name,
+								Device: p.cfg.Device,
+								Color:  p.cfg.Color,
+								Data:   line,
+								Ts:     time.Now().UTC().Format(time.RFC3339),
+							})
+						}
+						lineBuf = lineBuf[:0]
+					case '\r':
+						// skip — handled as part of \r\n or ignored
+					default:
+						lineBuf = append(lineBuf, b)
+					}
+				}
+			}
+			if err != nil {
+				readErr <- err
+				return
+			}
 		}
-		readDone <- scanner.Err()
 	}()
 
 	select {
@@ -113,11 +174,8 @@ func (p *Port) connect(ctx context.Context) error {
 		return nil
 	case err := <-writeErr:
 		return err
-	case err := <-readDone:
-		if err != nil {
-			return err
-		}
-		return nil
+	case err := <-readErr:
+		return err
 	}
 }
 

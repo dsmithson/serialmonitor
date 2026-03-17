@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Serial Monitor</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="xterm.css" />
 </head>
 <body>
   <header>
@@ -24,6 +25,7 @@
         <label class="checkbox-label">
           <input type="checkbox" id="stream-autoscroll" checked /> Auto-scroll
         </label>
+        <button id="stream-save">Save Log</button>
         <button id="stream-clear">Clear</button>
       </div>
     </div>
@@ -33,30 +35,38 @@
 
   <!-- ── TERMINAL ─────────────────────────────────────────── -->
   <section id="tab-terminal" class="tab">
-    <div class="terminal-toolbar">
-      <label for="term-port-select">Port:</label>
-      <select id="term-port-select"><option value="">— select —</option></select>
-      <span id="term-status" class="status-dot disconnected"></span>
+    <div class="terminal-container">
+      <div class="term-port-tabs" id="term-port-tabs">
+        <div class="term-port-tabs-label">Ports</div>
+        <!-- populated dynamically -->
+      </div>
+      <div class="term-right-pane">
+        <div class="term-xterm-toolbar">
+          <button id="term-save">Save Log</button>
+        </div>
+        <div class="term-xterminals" id="term-xterminals">
+          <!-- one xterm wrapper per port, shown/hidden -->
+        </div>
+      </div>
     </div>
-    <div id="term-output" class="output-panel"></div>
-    <form id="term-form" class="send-bar">
-      <input id="term-input" type="text" placeholder="Type command and press Enter…" autocomplete="off" />
-      <label class="checkbox-label" title="Append carriage-return + line-feed">
-        <input type="checkbox" id="term-crlf" checked /> CR+LF
-      </label>
-      <button type="submit">Send</button>
-    </form>
   </section>
 
   <!-- ── CONFIGURATION ────────────────────────────────────── -->
   <section id="tab-config" class="tab">
     <div class="config-toolbar">
       <button id="cfg-scan">Scan for devices</button>
+      <button id="cfg-save-all">Save Changes</button>
+      <span class="cfg-sep"></span>
+      <label class="settings-label">Stream buffer:
+        <input type="number" id="cfg-buffer-size" min="0" max="10000" step="50" value="300" />
+        <span class="settings-hint">lines (0 = off)</span>
+      </label>
     </div>
     <div id="cfg-message" class="cfg-message hidden"></div>
     <table id="cfg-table">
       <thead>
         <tr>
+          <th class="grip-th"></th>
           <th>Device</th>
           <th>Name</th>
           <th>Baud</th>
@@ -65,7 +75,7 @@
           <th>Stop bits</th>
           <th>Color</th>
           <th>Enabled</th>
-          <th>Actions</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="cfg-tbody"></tbody>
@@ -77,6 +87,8 @@
     </div>
   </section>
 
+  <script src="xterm.min.js"></script>
+  <script src="xterm-addon-fit.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

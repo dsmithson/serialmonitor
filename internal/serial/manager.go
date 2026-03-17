@@ -29,8 +29,7 @@ func NewManager(hub *broadcast.Hub) *Manager {
 	}
 }
 
-// Sync reconciles running ports with the provided config, starting and stopping
-// as needed. Safe to call at any time (e.g. on config reload).
+// Sync reconciles running ports with the provided config.
 func (m *Manager) Sync(cfg *config.Config) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -42,7 +41,6 @@ func (m *Manager) Sync(cfg *config.Config) {
 		}
 	}
 
-	// Stop ports no longer desired
 	for device, entry := range m.active {
 		if _, ok := desired[device]; !ok {
 			slog.Info("stopping serial port", "device", device)
@@ -51,10 +49,8 @@ func (m *Manager) Sync(cfg *config.Config) {
 		}
 	}
 
-	// Start new ports or restart ports with changed config
 	for device, pcfg := range desired {
 		if existing, ok := m.active[device]; ok {
-			// Restart if config changed
 			if configChanged(existing.port.cfg, pcfg) {
 				slog.Info("restarting serial port due to config change", "device", device)
 				existing.cancel()
@@ -75,8 +71,8 @@ func (m *Manager) startLocked(pcfg config.PortConfig) {
 	go p.run(ctx)
 }
 
-// Send delivers data to the named port (by port name, not device).
-func (m *Manager) Send(portName, data string) bool {
+// Send delivers raw bytes to the named port (by port name).
+func (m *Manager) Send(portName string, data []byte) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, entry := range m.active {
@@ -86,6 +82,31 @@ func (m *Manager) Send(portName, data string) bool {
 		}
 	}
 	return false
+}
+
+// RegisterTerminal creates a raw-byte terminal connection to a named port.
+// Returns nil if the port is not currently active.
+func (m *Manager) RegisterTerminal(portName string) *TermConn {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, entry := range m.active {
+		if entry.port.cfg.Name == portName {
+			return entry.port.RegisterTerminal()
+		}
+	}
+	return nil
+}
+
+// UnregisterTerminal removes a terminal connection from the named port.
+func (m *Manager) UnregisterTerminal(portName string, tc *TermConn) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, entry := range m.active {
+		if entry.port.cfg.Name == portName {
+			entry.port.UnregisterTerminal(tc)
+			return
+		}
+	}
 }
 
 // StopAll shuts down all running ports.

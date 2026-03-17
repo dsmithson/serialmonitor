@@ -22,24 +22,25 @@ const (
 )
 
 type PortConfig struct {
-	Device   string   `yaml:"device"`
-	Name     string   `yaml:"name"`
-	Enabled  bool     `yaml:"enabled"`
-	BaudRate int      `yaml:"baud_rate"`
-	DataBits int      `yaml:"data_bits"`
-	Parity   Parity   `yaml:"parity"`
-	StopBits StopBits `yaml:"stop_bits"`
-	Color    string   `yaml:"color,omitempty"`
+	Device   string   `yaml:"device"    json:"device"`
+	Name     string   `yaml:"name"      json:"name"`
+	Enabled  bool     `yaml:"enabled"   json:"enabled"`
+	BaudRate int      `yaml:"baud_rate" json:"baud_rate"`
+	DataBits int      `yaml:"data_bits" json:"data_bits"`
+	Parity   Parity   `yaml:"parity"    json:"parity"`
+	StopBits StopBits `yaml:"stop_bits" json:"stop_bits"`
+	Color    string   `yaml:"color,omitempty" json:"color,omitempty"`
 }
 
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host       string `yaml:"host"        json:"host"`
+	Port       int    `yaml:"port"        json:"port"`
+	BufferSize int    `yaml:"buffer_size" json:"buffer_size"` // stream history lines, default 300
 }
 
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	Ports  []PortConfig `yaml:"ports"`
+	Server ServerConfig `yaml:"server" json:"server"`
+	Ports  []PortConfig `yaml:"ports"  json:"ports"`
 }
 
 // Default palette assigned to ports without an explicit color.
@@ -50,9 +51,15 @@ var defaultColors = []string{
 
 func Default() *Config {
 	return &Config{
-		Server: ServerConfig{Host: "0.0.0.0", Port: 8080},
+		Server: ServerConfig{Host: "0.0.0.0", Port: 8080, BufferSize: 300},
 		Ports:  []PortConfig{},
 	}
+}
+
+func (m *Manager) SetOnChange(fn func(*Config)) {
+	m.mu.Lock()
+	m.onChange = fn
+	m.mu.Unlock()
 }
 
 func DefaultPort(device string) PortConfig {
@@ -121,14 +128,21 @@ func (m *Manager) Get() *Config {
 	return m.cfg
 }
 
-func (m *Manager) Save(cfg *Config) error {
-	assignMissingColors(cfg)
+func writeConfigFile(path string, cfg *Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshalling config: %w", err)
 	}
-	if err := os.WriteFile(m.path, data, 0644); err != nil {
-		return fmt.Errorf("writing config %s: %w", m.path, err)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("writing config %s: %w", path, err)
+	}
+	return nil
+}
+
+func (m *Manager) Save(cfg *Config) error {
+	assignMissingColors(cfg)
+	if err := writeConfigFile(m.path, cfg); err != nil {
+		return err
 	}
 	m.mu.Lock()
 	m.cfg = cfg
@@ -140,14 +154,13 @@ func (m *Manager) Save(cfg *Config) error {
 }
 
 // UpsertPort adds or replaces a port config entry by device path.
+// The mutex is held across the full read-modify-write to prevent concurrent
+// saves from overwriting each other (e.g. saving all 4 ports simultaneously).
 func (m *Manager) UpsertPort(p PortConfig) error {
 	m.mu.Lock()
-	cfg := m.cfg
-	m.mu.Unlock()
 
-	// clone ports slice
-	ports := make([]PortConfig, len(cfg.Ports))
-	copy(ports, cfg.Ports)
+	ports := make([]PortConfig, len(m.cfg.Ports))
+	copy(ports, m.cfg.Ports)
 
 	found := false
 	for i, existing := range ports {
@@ -161,24 +174,47 @@ func (m *Manager) UpsertPort(p PortConfig) error {
 		ports = append(ports, p)
 	}
 
-	newCfg := &Config{Server: cfg.Server, Ports: ports}
-	return m.Save(newCfg)
+	newCfg := &Config{Server: m.cfg.Server, Ports: ports}
+	assignMissingColors(newCfg)
+
+	if err := writeConfigFile(m.path, newCfg); err != nil {
+		m.mu.Unlock()
+		return err
+	}
+	m.cfg = newCfg
+	m.mu.Unlock()
+
+	if m.onChange != nil {
+		m.onChange(newCfg)
+	}
+	return nil
 }
 
 // DeletePort removes a port config entry by device path.
 func (m *Manager) DeletePort(device string) error {
 	m.mu.Lock()
-	cfg := m.cfg
-	m.mu.Unlock()
 
-	ports := make([]PortConfig, 0, len(cfg.Ports))
-	for _, p := range cfg.Ports {
+	ports := make([]PortConfig, 0, len(m.cfg.Ports))
+	for _, p := range m.cfg.Ports {
 		if p.Device != device {
 			ports = append(ports, p)
 		}
 	}
-	newCfg := &Config{Server: cfg.Server, Ports: ports}
-	return m.Save(newCfg)
+
+	newCfg := &Config{Server: m.cfg.Server, Ports: ports}
+	assignMissingColors(newCfg)
+
+	if err := writeConfigFile(m.path, newCfg); err != nil {
+		m.mu.Unlock()
+		return err
+	}
+	m.cfg = newCfg
+	m.mu.Unlock()
+
+	if m.onChange != nil {
+		m.onChange(newCfg)
+	}
+	return nil
 }
 
 func assignMissingColors(cfg *Config) {

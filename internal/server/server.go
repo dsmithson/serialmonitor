@@ -46,6 +46,7 @@ func New(cfgMgr *config.Manager, hub *broadcast.Hub, serialMgr *serial.Manager) 
 	r.Post("/api/ports/{name}/disable", s.apiSetPortEnabled(false))
 	r.Post("/api/ports/{name}/send", s.apiSendToPort)
 	r.Get("/api/config", s.apiGetConfig)
+	r.Put("/api/config", s.apiSaveConfig)
 
 	// Serve embedded static web UI
 	r.Handle("/*", http.FileServer(http.FS(web.Static)))

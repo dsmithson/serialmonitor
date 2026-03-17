@@ -31,7 +31,7 @@ func (s *Server) apiListPorts(w http.ResponseWriter, r *http.Request) {
 
 	type portStatus struct {
 		config.PortConfig
-		Connected bool `json:"connected"`
+		Connected bool `json:"connected"` // already lowercase, but explicit
 	}
 
 	result := make([]portStatus, len(cfg.Ports))
@@ -123,7 +123,7 @@ func (s *Server) apiSendToPort(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if !s.serial.Send(name, req.Data) {
+	if !s.serial.Send(name, []byte(req.Data)) {
 		writeError(w, http.StatusNotFound, "port not active")
 		return
 	}
@@ -132,5 +132,28 @@ func (s *Server) apiSendToPort(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/config
 func (s *Server) apiGetConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.cfgMgr.Get())
+}
+
+// PUT /api/config — replace the full config (ports in caller-supplied order,
+// server settings updated except host/port which require a restart).
+func (s *Server) apiSaveConfig(w http.ResponseWriter, r *http.Request) {
+	var incoming config.Config
+	if err := json.NewDecoder(r.Body).Decode(&incoming); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	existing := s.cfgMgr.Get()
+	// Preserve host/port — changing them requires a process restart
+	incoming.Server.Host = existing.Server.Host
+	incoming.Server.Port = existing.Server.Port
+	if incoming.Server.BufferSize <= 0 {
+		incoming.Server.BufferSize = 300
+	}
+	if err := s.cfgMgr.Save(&incoming); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.serial.Sync(s.cfgMgr.Get())
 	writeJSON(w, http.StatusOK, s.cfgMgr.Get())
 }
