@@ -1,5 +1,6 @@
 # Binaries
-serialmonitor
+/serialmonitor
+/serialmonitor-*
 *.exe
 
 # Build output
