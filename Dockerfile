@@ -2,7 +2,7 @@
 # $BUILDPLATFORM = the runner's arch (always amd64 on GitHub Actions).
 # Pinning the builder here lets Go cross-compile natively rather than
 # emulating the entire build under QEMU, which can take 10–30× longer.
-FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 WORKDIR /src
 
@@ -18,16 +18,14 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o /out/serialmonitor ./cmd/serialmonitor
 
 # ── Runtime stage ─────────────────────────────────────────────
-FROM debian:bookworm-slim
+FROM alpine:3
 
 # ca-certificates for any future TLS work
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates
 
 # Run as non-root — serial ports typically require dialout group
-RUN groupadd -r dialout 2>/dev/null || true \
-    && useradd -r -g dialout -s /sbin/nologin serialmonitor
+RUN addgroup -S dialout 2>/dev/null || true \
+    && adduser -S -G dialout -s /sbin/nologin serialmonitor
 
 WORKDIR /app
 COPY --from=builder /out/serialmonitor .
