@@ -1,5 +1,8 @@
 # ── Build stage ──────────────────────────────────────────────
-FROM golang:1.26-bookworm AS builder
+# $BUILDPLATFORM = the runner's arch (always amd64 on GitHub Actions).
+# Pinning the builder here lets Go cross-compile natively rather than
+# emulating the entire build under QEMU, which can take 10–30× longer.
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS builder
 
 WORKDIR /src
 
