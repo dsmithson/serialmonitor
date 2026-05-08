@@ -6,14 +6,17 @@ FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 WORKDIR /src
 
+# Declare before COPY so these are part of the cache key for all subsequent layers,
+# preventing external cache backends (e.g. GHA) from reusing amd64 layers for arm64 builds.
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
 # Cache dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
 # Build (CGO_ENABLED=0 for pure-Go serial library)
 COPY . .
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o /out/serialmonitor ./cmd/serialmonitor
 
