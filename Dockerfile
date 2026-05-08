@@ -1,15 +1,10 @@
 # ── Build stage ──────────────────────────────────────────────
-# $BUILDPLATFORM = the runner's arch (always amd64 on GitHub Actions).
-# Pinning the builder here lets Go cross-compile natively rather than
-# emulating the entire build under QEMU, which can take 10–30× longer.
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+# No --platform override: BuildKit runs this stage natively for each target
+# platform (via QEMU for arm64). CGO_ENABLED=0 keeps it pure-Go so QEMU
+# emulation is the only requirement — no cross-toolchain needed.
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /src
-
-# Declare before COPY so these are part of the cache key for all subsequent layers,
-# preventing external cache backends (e.g. GHA) from reusing amd64 layers for arm64 builds.
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
 
 # Cache dependencies
 COPY go.mod go.sum ./
@@ -17,7 +12,7 @@ RUN go mod download
 
 # Build (CGO_ENABLED=0 for pure-Go serial library)
 COPY . .
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+RUN CGO_ENABLED=0 \
     go build -ldflags="-s -w" -o /out/serialmonitor ./cmd/serialmonitor
 
 # ── Runtime stage ─────────────────────────────────────────────
